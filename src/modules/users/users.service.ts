@@ -7,7 +7,9 @@ import { Model } from 'mongoose';
 import { hashPasswordHelper } from '@/helpers/util';
 import aqp from 'api-query-params';
 import mongoose from 'mongoose';
-
+import {v4 as uuidv4} from 'uuid'
+import dayjs from 'dayjs';
+import { use } from 'passport';
 
 @Injectable()
 export class UsersService {
@@ -80,7 +82,28 @@ export class UsersService {
     if(mongoose.isValidObjectId(_id)){
       return this.userModel.deleteOne({_id});
     }else{
-      throw new BadRequestException('Id khong dung dinh dang')
+      throw new BadRequestException('Id không đúng định dạng')
+    }
+  }
+
+  async handleRegister (registerDto:CreateUserDto) {
+    const {name, email, password} = registerDto
+    //check Exit
+    const isExit = await this.isEmailExist(email)
+    if(isExit === true)
+      throw new BadRequestException('Email đã tồn tại, vui lòng sử dụng email khác')
+
+    //check hashPassword
+    const hashPassword = await hashPasswordHelper(password)
+    const user = await this.userModel.create({
+      name, email, password: hashPassword,
+      isActive:false,
+      codeId:uuidv4(),
+      codeExpired: dayjs().add(1,'minutes')
+    })
+    //trả ra phản hồi
+    return {
+      _id : user._id
     }
   }
 }
