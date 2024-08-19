@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './schemas/user.schemas';
@@ -6,6 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { hashPasswordHelper } from '@/helpers/util';
 import aqp from 'api-query-params';
+import mongoose from 'mongoose';
 
 
 @Injectable()
@@ -33,7 +34,7 @@ export class UsersService {
     //hash password
     const hashPassword =  await hashPasswordHelper(password)
     const user = await this.userModel.create({
-      name , email,password : hashPassword,phone,address,image
+      name, email, password : hashPassword, phone, address, image
     })
     return {
       _id : user._id
@@ -65,12 +66,21 @@ export class UsersService {
   findOne(id: number) {
     return `This action returns a #${id} user`;
   }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  
+  async findByEmail (email:string){
+    return await this.userModel.findOne({email})
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async update( updateUserDto: UpdateUserDto) {
+    return await this.userModel.updateOne(
+      {_id : updateUserDto._id},{...updateUserDto});
+  }
+
+  remove(_id: string) {
+    if(mongoose.isValidObjectId(_id)){
+      return this.userModel.deleteOne({_id});
+    }else{
+      throw new BadRequestException('Id khong dung dinh dang')
+    }
   }
 }

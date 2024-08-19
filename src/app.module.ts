@@ -12,6 +12,7 @@ import { MenusModule } from './modules/menus/menus.module';
 import { MenuItemsModule } from './modules/menu.items/menu.items.module';
 import { MenuItemOptionsModule } from './modules/menu.item.options/menu.item.options.module';
 import { LikesModule } from './modules/likes/likes.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [UsersModule,
@@ -31,7 +32,9 @@ import { LikesModule } from './modules/likes/likes.module';
         uri: configService.get<string>('MONGODB_URI'),
       }),
       inject: [ConfigService],
-    })
+    }),
+
+    AuthModule
   ],
   controllers: [AppController],
   providers: [AppService],
