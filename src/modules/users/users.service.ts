@@ -11,6 +11,7 @@ import {v4 as uuidv4} from 'uuid'
 import dayjs from 'dayjs';
 import { use } from 'passport';
 import { MailerService } from '@nestjs-modules/mailer';
+import { ChangePasswordDto, VerifyDto } from '@/auth/dto/create-auth.dto';
 
 @Injectable()
 export class UsersService {
@@ -64,7 +65,14 @@ export class UsersService {
     .skip(skip)
     .select("-password")
     .sort(sort as any)
-    return {results,totalPages};
+    return {
+      meta: {
+        current: current, //trang hiện tại
+        pageSize: pageSize, //số lượng bản ghi đã lấy
+        pages: totalPages,  //tổng số trang với điều kiện query
+        total: totalItems // tổng số phần tử (số bản ghi)
+      },
+      results};
   }
 
   findOne(id: number) {
@@ -102,7 +110,7 @@ export class UsersService {
       name, email, password: hashPassword,
       isActive:false,
       codeId:codeId,
-      codeExpired: dayjs().add(1,'minutes')
+      codeExpired: dayjs().add(5,'days')
     })
 
     this.mailerService.sendMail({
@@ -119,7 +127,101 @@ export class UsersService {
     return {
       _id : user._id
     }
+  }
+  async handleCheckVeirfy (data: VerifyDto){
+    const user = await this.userModel.findOne({
+      _id : data._id,
+      codeId : data.code
+    })
+    if(!user){
+       throw new BadRequestException("Mã code không hợp lệ")
+    }
+    const isBeforeCheck = dayjs().isBefore(user.codeExpired)
+    if(isBeforeCheck){
+      await this.userModel.updateOne({_id : data._id},{
+        isActive : true
+      })
+      return {isBeforeCheck};
+    }else{
+      throw new BadRequestException("Mã code đã hết hạn")
+    }
+  }
+
+  async handleCheckActive (email:string){
+    const user = await this.userModel.findOne({email})
+    if(!user){
+      throw new BadRequestException("Tài khoản không tồn tại")
+    }
+    if(user.isActive){
+      throw new BadRequestException("Tài đã được kích hoạt")
+    }else{
+      const codeId = uuidv4();
+      await user.updateOne({
+        codeId:codeId,
+        codeExpired: dayjs().add(5,'days')
+      })
+
+      this.mailerService.sendMail({
+        to: 'nguyentiendat120299@gmail.com', 
+        subject: 'Testing Nest MailerModule ✔', // Subject line\
+        text:"welcome retry Active Email",
+        template: 'register', // `.hbs` extension is appended automatically
+        context: {
+            name: user?.name ?? user.email,
+            activationCode: codeId
+        }
+    })
+    }
+    return {_id : user._id}
+  }
+
+  async handleCheckEmail (email : string){
+    const user = await this.userModel.findOne({email})
+    if(user){
+      const codeId = uuidv4();
+      await user.updateOne({
+        codeId:codeId,
+        codeExpired: dayjs().add(5,'days')
+      })
+
+      this.mailerService.sendMail({
+        to: 'nguyentiendat120299@gmail.com', 
+        subject: 'Testing Nest MailerModule ✔', // Subject line\
+        text:"welcome retry Active Email",
+        template: 'register', // `.hbs` extension is appended automatically
+        context: {
+            name: user?.name ?? user.email,
+            activationCode: codeId
+        }
+    })
+    return true
+    }else{
+      throw new BadRequestException("Email không hợp lệ")
+    }
+  }
 
 
+  async handleChangePassword (changePasswordDto :  ChangePasswordDto){
+    const user = await this.userModel.findOne({
+      codeId : changePasswordDto.code
+    })
+    if(changePasswordDto.confirmPassword !== changePasswordDto.password){
+      throw new BadRequestException("Mật khẩu/ xác nhận mật khẩu không chính xác !")
+   }
+    if(!user){
+       throw new BadRequestException("Email không tồn tại")
+    }
+    else if(user){
+
+    }
+    const isBeforeCheck = dayjs().isBefore(user.codeExpired)
+    if(isBeforeCheck){
+      const newPasword = await hashPasswordHelper(changePasswordDto.password)
+      await user.updateOne({password : newPasword})
+      return {isBeforeCheck};
+    }else{
+      throw new BadRequestException("Mã code đã hết hạn")
+    }
   }
 }
+
